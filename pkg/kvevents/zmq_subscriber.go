@@ -101,25 +101,31 @@ func (z *zmqSubscriber) runSubscriber(ctx context.Context) {
 		logger.Info("Connected subscriber socket", "endpoint", z.endpoint)
 	}
 
+	logger.Info("Subscribing to topic filter", "topic", z.topicFilter)
+
 	if err := sub.SetOption(zmq4.OptionSubscribe, z.topicFilter); err != nil {
 		logger.Error(err, "Failed to subscribe to topic filter", "topic", z.topicFilter)
 		return
 	}
 
-	debugLogger := logger.V(logging.DEBUG)
+	logger.Info("Subscribed to topic filter", "topic", z.topicFilter)
 
 	for {
 		msg, err := sub.Recv()
 		if err != nil {
 			if ctx.Err() != nil {
+				logger.Info("Shutting down zmq-subscriber")
 				return // context cancelled, clean shutdown
 			}
-			debugLogger.Error(err, "Failed to receive message from zmq subscriber", "endpoint", z.endpoint)
+			logger.Error(err, "Failed to receive message from zmq subscriber", "endpoint", z.endpoint)
 			return // exit to trigger reconnect
 		}
+
+		logger.Info("Received message from zmq subscriber", "msg", msg)
+
 		parts := msg.Frames
 		if len(parts) != 3 {
-			debugLogger.Error(nil, "Unexpected frame count", "got", len(parts), "want", 3)
+			logger.Error(nil, "Unexpected frame count", "got", len(parts), "want", 3)
 			continue
 		}
 		topic := string(parts[0])
@@ -128,7 +134,7 @@ func (z *zmqSubscriber) runSubscriber(ctx context.Context) {
 
 		seq := binary.BigEndian.Uint64(seqBytes)
 
-		debugLogger.V(logging.TRACE).Info("Received message from zmq subscriber",
+		logger.V(logging.TRACE).Info("Received message from zmq subscriber",
 			"topic", topic,
 			"seq", seq,
 			"payloadSize", len(payload))
